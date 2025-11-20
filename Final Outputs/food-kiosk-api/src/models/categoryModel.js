@@ -1,9 +1,8 @@
 const db = require('../config/database'); 
 
-// --- READ: getCategories (Retrieve all categories) ---
 const getCategories = async () => {
     try {
-        const sql = 'SELECT category_id, name, description, is_active, created_at FROM tbl_categories ORDER BY name ASC';
+        const sql = 'SELECT category_id, category_name FROM tbl_categories ORDER BY category_id ASC';
         
         const [rows] = await db.query(sql); 
         return rows;
@@ -13,15 +12,12 @@ const getCategories = async () => {
     }
 };
 
-// --- NEW READ: getCategoryById (Retrieve a single category by ID) ---
 const getCategoryById = async (id) => {
     try {
         // Query to select one specific category
-        const sql = 'SELECT category_id, name, description, is_active, created_at FROM tbl_categories WHERE category_id = ?';
+        const sql = 'SELECT category_id, category_name, is_active, created_at FROM tbl_categories WHERE category_id = ?';
         
         const [rows] = await db.query(sql, [id]); 
-        
-        // Return the first row (the category object) or undefined/null if not found
         return rows[0]; 
     } catch (error) {
         console.error(`Error fetching category with ID ${id}:`, error);
@@ -29,11 +25,9 @@ const getCategoryById = async (id) => {
     }
 };
 
-// --- NEW READ: getActiveCategories (Retrieve only active categories) ---
 const getActiveCategories = async () => {
     try {
-        // Query to select categories where is_active is true (1)
-        const sql = 'SELECT category_id, name, description FROM tbl_categories WHERE is_active = 1 ORDER BY name ASC';
+        const sql = 'SELECT category_id, category_name FROM tbl_categories WHERE is_active = 1 ORDER BY category_id ASC';
         
         const [rows] = await db.query(sql); 
         return rows;
@@ -43,19 +37,16 @@ const getActiveCategories = async () => {
     }
 };
 
-// --- CREATE: createCategory (Insert a new category) ---
-const createCategory = async (name, description, is_active = true) => {
+const createCategory = async (category_name) => {
     try {
-        const sql = 'INSERT INTO tbl_categories (name, description, is_active) VALUES (?, ?, ?)';
-        const params = [name, description, is_active];
+        const sql = 'INSERT INTO tbl_categories (category_name) VALUES (?)';
+        const params = [category_name];
         
         const [result] = await db.query(sql, params);
         
         return { 
             category_id: result.insertId, 
-            name, 
-            description, 
-            is_active 
+            category_name 
         };
     } catch (error) {
         console.error("Error creating category:", error);
@@ -63,18 +54,13 @@ const createCategory = async (name, description, is_active = true) => {
     }
 };
 
-// --- UPDATE: updateCategory (Modify an existing category by ID) ---
-const updateCategory = async (id, name, description, is_active) => {
+const updateCategory = async (id, category_name, is_active) => {
     const setClauses = [];
     const values = [];
 
-    if (name !== undefined) {
-        setClauses.push('name = ?');
-        values.push(name);
-    }
-    if (description !== undefined) {
-        setClauses.push('description = ?');
-        values.push(description);
+    if (category_name !== undefined) {
+        setClauses.push('category_name = ?');
+        values.push(category_name);
     }
     if (is_active !== undefined) { 
         setClauses.push('is_active = ?');
@@ -97,7 +83,6 @@ const updateCategory = async (id, name, description, is_active) => {
     }
 };
 
-// --- DELETE: deleteCategory (Remove a category by ID) ---
 const deleteCategory = async (id) => {
     try {
         const sql = 'DELETE FROM tbl_categories WHERE category_id = ?';
@@ -111,11 +96,10 @@ const deleteCategory = async (id) => {
     }
 };
 
-// Export all model functions (including the new ones)
 module.exports = {
     getCategories,
-    getCategoryById, // NEW EXPORT
-    getActiveCategories, // NEW EXPORT
+    getCategoryById, 
+    getActiveCategories,
     createCategory,
     updateCategory,
     deleteCategory,

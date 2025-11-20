@@ -1,7 +1,5 @@
-// Imports the Category Model which contains all the database logic
 const categoryModel = require('../models/categoryModel');
 
-// --- READ ALL (index): GET /api/categories ---
 const index = async (req, res) => {
     try {
         const categories = await categoryModel.getCategories();
@@ -21,7 +19,6 @@ const index = async (req, res) => {
     }
 };
 
-// --- READ BY ID (show): GET /api/categories/:id ---
 const show = async (req, res) => {
     const categoryId = req.params.id;
     try {
@@ -49,7 +46,6 @@ const show = async (req, res) => {
     }
 };
 
-// --- READ ACTIVE (indexActive): GET /api/categories/active ---
 const indexActive = async (req, res) => {
     try {
         const activeCategories = await categoryModel.getActiveCategories();
@@ -69,12 +65,10 @@ const indexActive = async (req, res) => {
     }
 };
 
-
-// --- CREATE (store): POST /api/categories ---
 const store = async (req, res) => {
-    const { name, description, is_active } = req.body;
+    const { category_name, is_active } = req.body;
 
-    if (!name) {
+    if (!category_name) {
         return res.status(400).json({
             success: false,
             message: 'Category name is required.',
@@ -82,7 +76,7 @@ const store = async (req, res) => {
     }
 
     try {
-        const newCategory = await categoryModel.createCategory(name, description, is_active);
+        const newCategory = await categoryModel.createCategory(category_name, is_active);
         
         return res.status(201).json({
             success: true,
@@ -106,20 +100,19 @@ const store = async (req, res) => {
     }
 };
 
-// --- UPDATE (update): PUT /api/categories/:id ---
 const update = async (req, res) => {
     const categoryId = req.params.id;
-    const { name, description, is_active } = req.body;
+    const { category_name, is_active } = req.body;
 
-    if (!name && !description && is_active === undefined) {
+    if (!category_name && is_active === undefined) {
         return res.status(400).json({
             success: false,
-            message: 'At least one field (name, description, or is_active) must be provided for update.',
+            message: 'At least one field (category_name, or is_active) must be provided for update.',
         });
     }
 
     try {
-        const result = await categoryModel.updateCategory(categoryId, name, description, is_active);
+        const result = await categoryModel.updateCategory(categoryId, category_name, is_active);
 
         if (result.affected === 0) {
             return res.status(404).json({
@@ -142,7 +135,6 @@ const update = async (req, res) => {
     }
 };
 
-// --- DELETE (destroy): DELETE /api/categories/remove/:id ---
 const destroy = async (req, res) => {
     const categoryId = req.params.id;
 
@@ -177,8 +169,6 @@ const destroy = async (req, res) => {
     }
 };
 
-// --- Collective Export ---
-// This makes all the functions above public and accessible to categoryRoutes.js
 module.exports = {
     index,
     show,

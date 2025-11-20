@@ -13,11 +13,8 @@ router.get('/:id', foodController.indexById);
 // GET /api/fooditems
 router.get('/', foodController.index);
 
-
-
 // POST /api/fooditems 
 router.post('/', foodController.store);
-
 
 // PUT /api/fooditems/available/:id
 router.put('/available/:id', foodController.updateAvailability);
@@ -28,10 +25,8 @@ router.put('/stock/:id', foodController.updateStock);
 // PUT /api/fooditems/:id 
 router.put('/:id', foodController.update);
 
-
 // DELETE /api/fooditems/:id
-router.delete('/:id', foodController.destroy);
-
+router.delete('/remove/:id', foodController.destroy);
 
 // Export the router so the main server file can use it
 module.exports = router;

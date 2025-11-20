@@ -7,10 +7,15 @@ const index = async (req, res) => {
         const foodItems = await foodModel.getFood();
         
         //If it's successful, sends the data back to the client with a 200 OK status. If it returns an error, goes into catch.
-        res.status(200).json(foodItems);
+        res.status(200).json({
+            success: true,
+            message: "All food items retrieved successfully.",
+            data: foodItems,
+        });
     } catch (error) {
         console.error("Error in index controller:", error);
         res.status(500).json({
+            success: false,
             message: "An internal server error occured while retrieving food items.",
             details: error.message
         });
@@ -26,12 +31,14 @@ const store = async (req, res) => {
         const newId = await foodModel.createFood(itemData);
 
         res.status(201).json({
-            id: newId,
-            message: "Food item created successfully."
+            success: true,
+            message: "Food item created successfully.",
+            id: newId
         });
     } catch (error) {
         console.log("Error in store controller:", error);
         res.status(500).json({
+            success: false,
             message: "Failed to create food item.",
             details: error.message
         });
@@ -51,16 +58,19 @@ const update = async (req, res) => {
 
         if (wasUpdated) {
             res.status(200).json({
+                success: true,
                 message: `Food item ID ${id} updated successfully`
             });
         } else {
             res.status(400).json({
+                success: false,
                 message: `Food item ID ${id} not found. No changes were made.`
             });
         }
     } catch (error) {
         console.error("Error in update controller:", error);
         res.status(400).json({
+            success: false,
             message: "Failed to update food item.",
             details: error.message
         });
