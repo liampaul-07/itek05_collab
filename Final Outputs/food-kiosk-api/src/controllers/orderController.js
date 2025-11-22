@@ -47,18 +47,18 @@ const store = async (req, res) => {
     try {
         const { total_amount } = req.body;
 
-        if (!total_amount || isNaN(total_amount) || total_amount < 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid total_amount."
-            });
-        } 
+        // if (!total_amount || isNaN(total_amount) || total_amount < 0) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "Invalid total_amount."
+        //     });
+        // } 
 
         const newId = await orderModel.createOrder(total_amount);
 
         res.status(201).json({
             success: true,
-            message: "Order created successfully",
+            message: "Order finished successfully",
             order_id: newId,
             total_amount: total_amount
         });

@@ -44,6 +44,9 @@ const createFood = async (itemData) => {
 const updateFood = async (id, itemData) => {
     try {
         //Query
+
+        
+
         const sql = 'UPDATE tbl_fooditems SET name = ?, category_id = ?, price = ?, stock = ?, is_available = ? WHERE food_id = ?';
 
         //Values array
