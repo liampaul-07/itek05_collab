@@ -1,8 +1,29 @@
 const db = require('../config/database');
 
-const getOrder = async () => {
+// CREATE Query
+const createOrder = async (customer_id, ticket_name) => {
+    const sql = 'INSERT INTO tbl_orders (customer_id, ticket_name) VALUES (?, ?)';
+    const values = [customer_id, ticket_name];
+
     try {
-        const sql = 'SELECT * FROM tbl_orders ORDER BY created_at DESC';
+        const [result] = await db.query(sql, values);
+        
+        return {
+            order_id: result.insertId,
+            customer_id: customer_id,
+            ticket_name: ticket_name
+        }
+    } catch (error) {
+        console.error("Error creating new order:", error);
+        throw error;
+    }
+};
+
+// GET Query
+const getOrder = async () => {
+    const sql = 'SELECT * FROM tbl_orders ORDER BY created_at DESC';
+    
+    try {
         const [rows] = await db.query(sql);
         return rows;
     } catch (error) {
@@ -11,67 +32,64 @@ const getOrder = async () => {
     }
 };
 
-const getOrderById = async (id) => {
+const getOrderById = async (order_id) => {
+    const sql = 'SELECT * FROM tbl_orders WHERE order_id = ?';
+
     try {
-        const sql = 'SELECT * FROM tbl_orders WHERE order_id = ? ORDER BY created_at DESC';
-        const [rows] = await db.query(sql, [id]);
+        const [rows] = await db.query(sql, [order_id]);
         return rows[0];
     } catch (error) {
-        console.error(`Error fetching order by specific ID ${id}:`, error);
+        console.error(`Error fetching order by specific ID ${order_id}:`, error);
         throw error;
     }
 };
 
-const createOrder = async () => {
+// UPDATE Queries
+const updateStatus = async (order_id, new_status) => {
+    const sql = 'UPDATE tbl_orders SET status = ? WHERE order_id = ?';
+    const values = [new_status, order_id];
+    
     try {
-        const sql = 'INSERT INTO tbl_orders (status) VALUES (?)';
-        const [result] = await db.query(sql, ['Pending']);
-
-        //Returns the ID of the new order
-        return result.insertId;
-    } catch (error) {
-        console.error("Error creating new order:", error);
-        throw error;
-    }
-};
-
-const deleteOrder = async (id) => {
-    try {
-        const sql = 'DELETE FROM tbl_orders WHERE order_id = ?';
-        const [result] = await db.query(sql, [id]);
+        const [result] = await db.query(sql, values);
         return result.affectedRows > 0;
     } catch (error) {
-        console.error(`Error deleting order with ID ${id}:`, error);
+        console.error(`Error updating status for Order ID ${order_id}`)
         throw error;
     }
 };
 
-const updateStatus = async (id, new_status) => {
-    try {
-        const sql = 'UPDATE tbl_orders SET status = ? WHERE order_id = ?';
-        const [result] = await db.query(sql, [new_status, id]);
+const updateTotalAmount = async (order_id) => {
+    const sql = 'SELECT SUM(line_total) AS new_total FROM tbl_orderdetails WHERE order_id = ?';
+    const updateSql = 'UPDATE tbl_orders SET total_amount = ? WHERE order_id = ?';
 
-        return result.affectedRows > 0;
-    } catch (error) {
-        console.error(`Error updating status for Order ID ${id}`)
-        throw error;
-    }
-};
+    try {  
+        const[totalResult] = await db.query(sql, [order_id]);
+        const newTotal = totalResult[0].new_total || 0;
 
-const updateTotalAmount = async (orderId) => {
-    try {
-        const sumSql = `SELECT SUM(price_at_order) AS new_total FROM tbl_orderdetails WHERE order_id = ?`;
-
-        const [sumResult] = await db.query(sumSql, [orderId]);
-        
-        const newTotal = sumResult[0].new_total || 0;
-
-        const updateSql = 'UPDATE tbl_orders SET total_amount = ? WHERE order_id = ?';
-        await db.query(updateSql, [newTotal, orderId]);
-        
+        await db.query(updateSql, [newTotal, order_id]);
         return newTotal;
     } catch (error) {
-        console.error(`Error calculating and updating total for Order ID ${id}:`, error);
+        console.error(`Error updating total amount for order: ${order_id}`, error);
+        throw error;
+    }
+}
+
+// DELETE Query
+const deleteOrder = async (order_id) => {
+    const sql1 = 'DELETE FROM tbl_orderdetails WHERE order_id = ?';
+    const sql2 = 'DELETE FROM tbl_orders WHERE order_id = ?';
+    
+    try {
+        await db.query('START TRANSACTION');
+
+        await db.query(sql1, [order_id]);
+
+        const [result] = await db.query(sql2, [order_id]);
+
+        await db.query('COMMIT');
+        return result.affectedRows > 0;
+    } catch (error) {
+        console.error(`Error deleting order with ID ${order_id}:`, error);
         throw error;
     }
 };

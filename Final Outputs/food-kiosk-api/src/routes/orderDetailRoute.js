@@ -3,13 +3,13 @@ const router = express.Router();
 const orderDetailController = require ('../controllers/orderDetailController');
 
 // POST 
-router.post('/:id/details', orderDetailController.store);
+router.post('/:orderId/details', orderDetailController.store);
 
 // PUT
 router.put('/:orderId/details/:detailId', orderDetailController.update);
 
 // GET by OrderDetailId
-router.get('/:orderId/details/:detailId', orderDetailController.indexByDetailId);
+router.get('/:orderId/details/:detailId', orderDetailController.showDetailId);
 
 // GET by OrderId
 router.get('/:orderId/details/', orderDetailController.indexByOrderId);

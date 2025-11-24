@@ -2,188 +2,306 @@ const orderDetailModel = require('../models/orderDetailModel');
 const orderModel = require('../models/orderModel');
 const foodModel = require('../models/foodModel');
 
-const store = async (req, res) => {
-    try {
-        const { food_id, quantity } = req.body;
-        const orderId = req.params.id;
-        
-        if ((food_id === undefined || isNaN(food_id) || food_id <= 0) || (quantity === undefined || isNaN(quantity) || quantity <= 0)) {
-            res.status(400).json({
-                success: false,
-                message: "Invalid input"
-            });
-        }
+const validateId = (id) => {
+    const parsedId = parseInt(id);
+    return !id || !Number.isInteger(parsedId) || parsedId <= 0 ? false : parsedId;
+};
 
-        const foodItem =  await foodModel.getFoodById(food_id);
-        const foodName = foodItem[0].name;
+const store = async (req, res) => {
+    const { food_id, quantity } = req.body;
+    const order_id = validateId(req.params.orderId);
+    const parsedFoodId = validateId(food_id);
+    const parsedQuantity = validateId(quantity);
+
+    if (!order_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid order ID format. Must be a positive integer.'
+        });
+    }
+    if (!parsedFoodId || !parsedQuantity) {
+        return res.status(400).json({
+            success: false,
+            message: "Food ID and quantity must be positive whole numbers."
+        });
+    }
+
+    try {    
+        const foodItemResult =  await foodModel.getFoodById(parsedFoodId);
         
-        if (!foodItem) {
-            res.status(404).json({
+        if (!foodItemResult || foodItemResult.length === 0) {
+            return res.status(404).json({
                 success: false,
                 message: "Food item not found."
             });
         }
 
-        const unitPrice = foodItem[0].price;
-        const lineItemTotal = unitPrice * quantity;
+        // Contains one record of food item.
+        const foodItem = foodItemResult[0];
 
-        const newDetailId = await orderDetailModel.createOrderDetail(orderId, food_id, quantity, lineItemTotal);
+        // Gets the individual columns of the food item.
+        const foodName = foodItem.name;
+        const unitPrice = foodItem.price;
+        const lineItemTotal = unitPrice * parsedQuantity;
 
-        const newTotalAmount = await orderModel.updateTotalAmount(orderId);
+        const newDetailId = await orderDetailModel.createOrderDetail(order_id, parsedFoodId, parsedQuantity, unitPrice, lineItemTotal);
+        await foodModel.adjustStock(parsedFoodId, -parsedQuantity);
+        
+        const finalTotalAmount = await orderModel.updateTotalAmount(order_id);
 
-        res.status(201).json({
+        return res.status(201).json({
             success: true,
-            message: "Order added successfully",
+            message: "Item added to order successfully",
             
-            food_name: foodName,
-            detail_id: newDetailId,
-
-            price_at_order: lineItemTotal,
-            newTotalAmount: newTotalAmount,      
+            data: {
+                order_detail_id: newDetailId,
+                receipt_item: {
+                    food_name: foodName,
+                    quantity: parsedQuantity,
+                    unit_price: unitPrice.toFixed(2),
+                    line_item_total: lineItemTotal.toFixed(2)
+                },
+                new_order_total: finalTotalAmount.toFixed(2)
+            }
         });
     } catch (error) {
         console.error("Error in store (add detail) controller:", error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             success: false, 
-            message: "Failed to add item to order."
+            message: "Internal Server Error during orderdetail creation."
         });
     }
 };
 
 const update = async (req, res) => {
-    try {
-        const { quantity, food_id } = req.body;
-        const orderId = req.params.orderId;
-        const detail_id = req.params.detailId;
+    const { quantity: newQuantity, food_id: newFoodId } = req.body;
+    const order_id = validateId(req.params.orderId);
+    const detail_id = validateId(req.params.detailId);
+    
+    if (!order_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid order ID format. Must be a positive integer.'
+        });
+    }
+    if (!detail_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid detail ID format. Must be a positive integer.'
+        });
+    }
+    
 
-        if (!orderId || !detail_id || !quantity || !food_id) {
-            res.status(400).json({
+    if (!newQuantity || newQuantity <= 0 || !newFoodId || newFoodId <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Quantity and Food ID must be positive numbers."
+        });
+    }
+
+    try {
+        const oldDetail = await orderDetailModel.getDetailById(order_id, detail_id);
+        
+        if (!oldDetail) {
+            return res.status(404).json({
                 success: false,
-                message: "Missing required input fields."
+                message: "Order detail item not found."
             })
-        } else if (quantity <= 0 || food_id <= 0 || detail_id <= 0 || orderId <= 0) {
-            res.status(400).json({
+        }
+        if (oldDetail.food_id !== newFoodId) {
+            return res.status(400).json({
                 success: false,
-                message: "Invalid input."
+                message: "Changing food_id is not allowed in this update route. Delete and re-add instead."
             })
         }
         
-        const foodItem = await foodModel.getFoodById(food_id);
+        const oldQuantity = oldDetail.quantity;
+        const stockAdjustment = oldQuantity - newQuantity;
 
-        if (!foodItem || foodItem.length === 0) {
-            res.status(404).json({
+        const foodItemResult = await foodModel.getFoodById(newFoodId);
+
+        if (!foodItemResult || foodItemResult.length === 0) {
+            return res.status(404).json({
                 success: false,
                 message: "Food item not found."
             });
         }
 
-        const price = foodItem[0].price;
-        const foodName = foodItem[0].name;
-        const newLineItemTotal = price * quantity;
+        const foodItem = foodItemResult[0];
+        const foodName = foodItem.name;
         
-        const result = await orderDetailModel.updateDetail(detail_id, quantity, newLineItemTotal); 
+        const unitPrice = foodItemResult[0].price;
+        const newLineItemTotal = unitPrice * newQuantity;
+        
+        const result = await orderDetailModel.updateDetail(
+            detail_id,
+            newQuantity, 
+            unitPrice,
+            newLineItemTotal
+        ); 
 
         if (result.affectedRows === 0) {
-            res.status(404).json({
+            return res.status(404).json({
                 success: false,
-                message: "Item may not exist in the order."
+                message: "Order detail item not found for update."
             });
         }
+        
+        await foodModel.adjustStock(newFoodId, stockAdjustment);
+        
+        const finalTotalAmount = await orderModel.updateTotalAmount(order_id);
 
-        const newTotalAmount = await orderModel.updateTotalAmount(orderId);
-
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "Order updated successfully",
             
-            food_name: foodName,
-            detail_id: detail_id,
-
-            price_at_order: newLineItemTotal,
-            new_total_amount: newTotalAmount,      
+            data: {
+                detail_id: detail_id,
+                receipt_item: {
+                    food_name: foodName,
+                    quantity: newQuantity,
+                    unit_price: unitPrice.toFixed(2),
+                    line_item_total: newLineItemTotal.toFixed(2)
+                },
+                new_order_total: finalTotalAmount.toFixed(2)
+            }     
         });
     } catch (error) {
         console.error("Error in updating order detail:", error);
-        throw error;
+        return res.status(500).json({
+            success: false,
+            message: "Internal Server Error during order detail update."
+        })
     }
 };
 
-const indexByDetailId = async (req, res) => {
+const showDetailId = async (req, res) => {
+    const detail_id = validateId(req.params.detailId);
+    const order_id = validateId(req.params.orderId); 
+
+    if (!detail_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid detail ID format. Must be a positive integer.'
+        });
+    }
+    if (!order_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid order ID format. Must be a positive integer.'
+        });
+    }
+
     try {
-        const detail_id = req.params.detailId;
-        const order_id = req.params.orderId;
+        const orderDetail = await orderDetailModel.getDetailById(order_id, detail_id);
 
-        const indexDetailId = await orderDetailModel.getDetailById(order_id,detail_id);
-
-        if (!indexDetailId) {
-            res.status(404).json({
-                status: false,
-                message: `Order Details ID: ${id} not found.`
-            });
-        } else {
-            res.status(200).json({
-                status: true,
-                message: `Successfully retrieved Order Detail ID: ${detail_id}`,
-                data: indexDetailId
+        if (!orderDetail) {
+            return res.status(404).json({
+                success: false,
+                message: `Order Details ID: ${detail_id} not found in OrderID: ${order_id}.`
             });
         } 
+        return res.status(200).json({
+            success: true,
+            message: `Successfully retrieved Order Detail ID: ${detail_id}`,
+            data: orderDetail
+        });
+
     } catch (error) {
-        console.error("Error in indexByDetailId controler:", error);
-        res.status(500).json({
-            status: false,
-            message: "Failed to retrieve order detail."
+        console.error("Error in showDetailId controler:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to retrieve order detail due to an internal server error."
         });
     }
 };
 
 const indexByOrderId = async (req, res) => {
-    try {
-        const order_id = req.params.orderId;
+    const order_id = validateId(req.params.orderId);
+    if (!order_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid order ID format. Must be a positive integer.'
+        });
+    }
 
+    try {
         const indexOrderId = await orderDetailModel.getDetailByOrderId(order_id);
         
-        if (!indexOrderId) {
-            res.status(404).json({
-                status: false,
-                message: `Order ID: ${id} not found.`
-            });
-        } else {
-            res.status(200).json({
-                status: true,
-                message: `Successfully retrieved Order ID: ${order_id}`,
-                data: indexOrderId
+        if (!indexOrderId || indexOrderId.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `No order details found for Order ID: ${order_id}.`
             });
         } 
+
+        res.status(200).json({
+            success: true,
+            message: `Successfully retrieved ${indexOrderId.length} detail lines for Order ID: ${order_id}`,
+            data: indexOrderId
+        });
+         
     } catch (error) {
         console.error("Error in indexByOrderId controler:", error);
         res.status(500).json({
             success: false,
-            message: "Failed to retrieve order detail."
+            message: "Failed to retrieve order details due to server error."
         });
     }
 };
 
 const destroy = async (req, res) => {
+    const detail_id = validateId(req.params.detailId);
+    const order_id = validateId(req.params.orderId);
+    
+    if (!detail_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid detail ID format. Must be a positive integer.'
+        });
+    }
+    if (!order_id) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid order ID format. Must be a positive integer.'
+        });
+    }
+
     try {
-        const detail_id = req.params.detailId;
-        const order_id = req.params.orderId;
+        const detailData = await orderDetailModel.getDetailById(order_id, detail_id);
 
-        const successDel = await orderDetailModel.deleteDetail(order_id, detail_id);
-
-        if (successDel === 0) {
-            res.status(404).json({
+        if (!detailData) {
+            return res.status(404).json({
                 success: false,
-                message: `Order Detail ID: ${detail_id} not found.`
-            });
-        } else {
-            res.status(200).json({
-                success: true,
-                message:`Record with Order Detail ID: ${detail_id} has been completely removed.`
+                message: `Order Detail ID: ${detail_id} not found in Order ID: ${order_id}.`
             });
         }
+        const { food_id, quantity } = detailData;
+
+        await orderDetailModel.deleteDetail(parsedOrderId, parsedDetailId);
+        
+        await foodModel.adjustStock(food_id, quantity);
+        
+        const finalTotalAmount = await orderModel.updateTotalAmount(parsedOrderId);
+
+        return res.status(200).json({
+            success: true,
+            message:`Order Detail ID: ${parsedDetailId} successfully removed. Stock refunded.`,
+            data: {
+                refunded_item: {
+                    food_id: food_id,
+                    quantity: quantity,
+                },
+                new_order_total: finalTotalAmount.toFixed(2)
+            }
+        });
+        
     } catch (error) {
         console.error("Error in destroy controller.", error);
-        throw error;
+        return res.status(500).json({
+            success: false,
+            message: "Internal Server Error during order detail deletion."
+        })
     }
 };
 
@@ -191,6 +309,6 @@ module.exports = {
     store,
     update,
     indexByOrderId,
-    indexByDetailId,
+    showDetailId,
     destroy,
 };

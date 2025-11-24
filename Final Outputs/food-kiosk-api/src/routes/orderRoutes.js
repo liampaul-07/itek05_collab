@@ -2,19 +2,18 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
 
-// GET /api/orders/:id
-router.get('/:id', orderController.indexById);
+// POST
+router.post('/', orderController.store)
 
-// GET /api/orders
+// GET
+router.get('/:orderId', orderController.show);
+
 router.get('/', orderController.index);
 
-// POST /api/orders
-router.post('/', orderController.store);
+// PUT /api/orders/status/:id
+router.put('/status/:orderId', orderController.updateStatus);
 
 // DELETE /api/orders/:id
-router.delete('/:id', orderController.destroy);
-
-// PUT /api/orders/status/:id
-router.put('/status/:id', orderController.updateStatus);
+router.delete('/:orderId', orderController.destroy);
 
 module.exports = router;
