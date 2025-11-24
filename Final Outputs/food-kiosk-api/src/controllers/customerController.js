@@ -1,5 +1,58 @@
 const customerModel = require('../models/customerModel');
 
+// --- CREATE (store): POST /api/customers ---
+const store = async (req, res) => {
+    const { customer_name, contact } = req.body; 
+    const illegalCharsRegex = /[^a-zA-Z0-9\s.,'&-]/;
+
+    if (!customer_name || typeof customer_name !== 'string' || customer_name.trim().length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Customer name is required and must be a valid text string.",
+        });
+    }
+
+    if (illegalCharsRegex.test(customer_name.trim())) {
+        return res.status(400).json({
+            success: false,
+            message: "Customer name must be a text string."
+        });
+    }
+    
+    if (!contact || typeof contact !== 'string' || contact.trim().length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Contact number is required and must be a non-empty string."
+        });
+    }
+    const phoneRegex = /^09\d{9}$/;
+
+    if (!phoneRegex.test(contact.trim())) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid contact number format. Please ensure it is 11 digits long, starts with '09', and contains only numbers (e.g., 09XXYYYYYYY)."
+        });
+    }
+    
+    try {
+        const newCustomer = await customerModel.createCustomer(customer_name, contact);
+        
+        if (newCustomer && newCustomer.customer_id > 0) {
+            return res.status(201).json({
+                success: true,
+                message: 'Customer created successfully.',
+                data: newCustomer,
+            });
+        }
+    } catch (error) {
+        console.error("Error in store controller:", error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal Server Error while creating customer.',
+        });
+    }
+};
+
 // --- READ ALL (index): GET /api/customers ---
 const index = async (req, res) => {
     try {
@@ -14,140 +67,162 @@ const index = async (req, res) => {
         console.error("Error in index controller:", error);
         return res.status(500).json({
             success: false,
-            message: 'An internal server error occurred while retrieving customers.',
-            details: error.message,
+            message: 'An internal server error occurred while retrieving customers.'
         });
     }
 };
 
 // --- READ BY ID (show): GET /api/customers/:id ---
-const indexByCategory = async (req, res) => {
-    const customerId = req.params.id;
+const show = async (req, res) => {
+    const customer_id = req.params.customerId;
+
     try {
-        const customer = await customerModel.getCustomerById(customerId);
+        const customer = await customerModel.getCustomerById(customer_id);
 
         if (!customer) {
             return res.status(404).json({
                 success: false,
-                message: `Customer with ID ${customerId} not found.`,
+                message: `Customer with ID ${customer_id} not found.`,
             });
         }
         
         return res.status(200).json({
             success: true,
-            message: `Customer ${customerId} retrieved successfully.`,
+            message: `Customer ${customer_id} retrieved successfully.`,
             data: customer,
         });
     } catch (error) {
-        console.error(`Error in show controller for ID ${customerId}:`, error);
+        console.error(`Error in show controller for ID ${customer_id}:`, error);
         return res.status(500).json({
             success: false,
-            message: 'Internal server error while fetching customer by ID.',
-            details: error.message,
+            message: 'Internal server error while fetching customer by ID.'
         });
     }
 };
 
-// --- CREATE (store): POST /api/customers ---
-const store = async (req, res) => {
-    // Expecting customer_name and contact from the request body
-    const { customer_name, contact } = req.body; 
-
-    // Basic validation
-    if (!customer_name) {
-        return res.status(400).json({
-            success: false,
-            message: 'Customer name is required.',
-        });
-    }
-
-    try {
-        // Pass the required fields to the model
-        const newCustomer = await customerModel.createCustomer(customer_name, contact);
-        
-        return res.status(201).json({
-            success: true,
-            message: 'Customer created successfully.',
-            data: newCustomer,
-        });
-    } catch (error) {
-        console.error("Error in store controller:", error);
-        if (error.message.includes('Duplicate entry') || error.message.includes('ER_DUP_ENTRY')) {
-             return res.status(409).json({
-                success: false,
-                message: 'Customer with this name or contact already exists.',
-                details: error.message,
-            });
-        }
-        return res.status(500).json({
-            success: false,
-            message: 'Internal Server Error while creating customer.',
-            details: error.message,
-        });
-    }
-};
-
-// --- UPDATE (update): PUT /api/customers/:id ---
+// UPDATE Controllers
 const update = async (req, res) => {
-    const customerId = req.params.id;
+    const customer_id = req.params.customerId;
     const { customer_name, contact, is_active } = req.body;
 
-    // Check if any fields were provided
-    if (!customer_name && !contact && is_active === undefined) {
+    const illegalCharsRegex = /[^a-zA-Z0-9\s.,'&-]/;
+    
+    if (!customer_name || typeof customer_name !== 'string' || customer_name.trim().length === 0) {
         return res.status(400).json({
             success: false,
-            message: 'At least one field must be provided for update.',
+            message: 'Invalid customer_name input. Please input the required and valid customer name (text).',
         });
     }
 
-    try {
-        const result = await customerModel.updateCustomer(customerId, customer_name, contact, is_active);
+    if (illegalCharsRegex.test(customer_name.trim())) {
+        return res.status(400).json({
+            success: false,
+            message: "Customer name must be a text string."
+        });
+    }
 
-        if (result.affected === 0) {
+    if (!contact || typeof contact !== 'string' || contact.trim().length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Contact number is required and must be a non-empty string."
+        });
+    }
+    const phoneRegex = /^09\d{9}$/;
+
+    if (!phoneRegex.test(contact.trim())) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid contact number format. Please ensure it is 11 digits long, starts with '09', and contains only numbers (e.g., 09XXYYYYYYY)."
+        });
+    }
+
+    if (is_active === undefined || typeof is_active !== "number" || (is_active !== 0 && is_active !== 1)) {
+        return res.status(400).json({ 
+            success: false, 
+            message: "Invalid is_active state. Must be 0 or 1 (integer)." 
+        });   
+    }
+
+    try {
+        const result = await customerModel.updateCustomer(customer_id, customer_name, contact, is_active);
+
+        if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
-                message: `Customer with ID ${customerId} not found.`,
+                message: `Customer with ID ${customer_id} not found.`,
             });
         }
-
         return res.status(200).json({
             success: true,
-            message: `Customer with ID ${customerId} updated successfully.`,
+            message: `Customer with ID ${customer_id} updated successfully.`,
+            data: result
         });
     } catch (error) {
-        console.error(`Error in update controller for ID ${customerId}:`, error);
+        console.error(`Error in update controller for ID ${customer_id}:`, error);
         return res.status(500).json({
             success: false,
             message: 'Internal Server Error while updating customer.',
-            details: error.message,
         });
     }
 };
 
-// --- DELETE (destroy): DELETE /api/customers/:id ---
-const destroy = async (req, res) => {
-    const customerId = req.params.id;
+//UPDATE is_active
+const updateActive = async (req, res) => {
+    const customer_id = req.params.customerId;
+    const { is_active } = req.body;
+
+    if (is_active === undefined || typeof is_active !== "number" || (is_active !== 0 && is_active !== 1)) {
+        return res.status(400).json({ 
+            success: false, 
+            message: "Invalid is_active state. Must be 0 or 1 (integer)." 
+        });   
+    }
 
     try {
-        const result = await customerModel.deleteCustomer(customerId);
+        const result = await customerModel.updateIsActive(customer_id, is_active);
 
-        if (result.affected === 0) {
+        if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
-                message: `Customer with ID ${customerId} not found.`,
+                message: `Customer with ID ${customer_id} not found.`,
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: `Customer with ID ${customer_id} is_active state updated successfully.`
+        });
+    } catch (error) {
+        console.error(`Error in update controller for ID ${customer_id}:`, error);
+        return res.status(500).json({
+            success: false,
+            message: 'Internal Server Error while updating is_active state of customer.',
+        });
+    }
+};
+
+// DELETE request
+const destroy = async (req, res) => {
+    const customer_id = req.params.customerId;
+
+    try {
+        const result = await customerModel.deleteCustomer(customer_id);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `Customer with ID ${customer_id} not found.`,
             });
         }
 
         return res.status(200).json({
             success: true,
-            message: `Customer with ID ${customerId} deleted successfully.`,
+            message: `Customer with ID ${customer_id} deleted successfully.`,
         });
     } catch (error) {
-        console.error(`Error in destroy controller for ID ${customerId}:`, error);
+        console.error(`Error in destroy controller for ID ${customer_id}:`, error);
         return res.status(500).json({
             success: false,
-            message: 'Internal Server Error while deleting customer.',
-            details: error.message,
+            message: 'Internal Server Error while deleting customer.'
         });
     }
 };
@@ -155,8 +230,9 @@ const destroy = async (req, res) => {
 // Collective Export
 module.exports = {
     index,
-    indexByCategory,
+    show,
     store,
     update,
+    updateActive,
     destroy,
 };
