@@ -15,7 +15,12 @@ const createOrderDetail = async (order_id, food_id, quantity, unit_price, line_t
 
 const updateDetail = async (detail_id, quantity, unit_price, line_item_total) => {
     const sql = 'UPDATE tbl_orderdetails SET quantity = ?, unit_price = ?, line_total = ? WHERE order_detail_id = ?';
-    const values = [quantity, unit_price, line_item_total, detail_id];
+    const values = [
+        quantity, 
+        parseFloat(unit_price).toFixed(2), 
+        parseFloat(line_item_total).toFixed(2), 
+        detail_id
+    ];
         
     try {
         const [rows] = await db.query(sql, values);
@@ -45,7 +50,7 @@ const getDetailById = async (order_id, detail_id) => {
 
     try {    
         const [rows] = await db.query(sql, values);
-        return rows[0];
+        return rows;
     } catch (error) {
         console.error("Error in fetching detail by order id:", error);
         throw error;

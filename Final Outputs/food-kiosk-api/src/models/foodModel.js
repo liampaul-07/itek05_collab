@@ -45,8 +45,7 @@ const getFoodById = async (food_id) => {
     try {
         //Should only return one(1) item, referenced by ID.
         const [itemResults] = await db.query(sql, [food_id]);
-        return itemResults[0];
-
+        return itemResults;
     } catch (error) {
         console.error("Error fetching food item by ID:", error);
         throw error;

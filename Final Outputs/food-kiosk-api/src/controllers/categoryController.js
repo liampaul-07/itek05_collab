@@ -5,17 +5,16 @@ const validateId = (id) => {
     return !id || !Number.isInteger(parsedId) || parsedId <= 0 ? false : parsedId;
 };
 
+const illegalCharsRegex = /^[a-zA-Z\s-&!]+$/;
+
 // CREATE/STORE Controller
 const store = async (req, res) => {
     const { category_name, is_active } = req.body;
 
-    const illegalCharsRegex = /^[a-zA-Z0-9\s-&!]+$/;
-
-    const trimmedName = category_name ? category_name.trim() : '';
-    if (trimmedName.length === 0) {
+    if (category_name === undefined || typeof category_name !== "string" || category_name.trim() === "") {
         return res.status(400).json({
-            success: false,
-            message: 'Category name contains disallowed characters. Only letters, numbers, spaces, hyphens (-), ampersands (&), and exclamation points (!) are permitted.'
+            success: false, 
+            message: "Invalid category_name input. Name must be a valid string."
         });
     }
    
@@ -26,10 +25,10 @@ const store = async (req, res) => {
         });   
     }
 
-    if (!illegalCharsRegex.test(trimmedName)) {
+    if (!illegalCharsRegex.test(category_name)) {
         return res.status(400).json({
             success: false,
-            message: "Category name must be a text string."
+            message: "Category name can't contain invalid characters."
         });
     }    
 
@@ -139,7 +138,6 @@ const indexActive = async (req, res) => {
 const update = async (req, res) => {
     const categoryId = validateId(req.params.categoryId);
     const { category_name, is_active } = req.body;
-    const illegalCharsRegex = /^[a-zA-Z0-9\s-&!]+$/;
 
     if (!categoryId) {
         return res.status(400).json({
@@ -148,11 +146,10 @@ const update = async (req, res) => {
         });
     }
     
-    const trimmedName = category_name ? category_name.trim() : '';
-    if (trimmedName.length === 0) {
+    if (category_name === undefined || typeof category_name !== "string" || category_name.trim() === "") {
         return res.status(400).json({
-            success: false,
-            message: 'Category name is required and cannot be empty'
+            success: false, 
+            message: "Invalid name input. Name must be a valid string."
         });
     }
 
@@ -163,15 +160,15 @@ const update = async (req, res) => {
         });    
     }
    
-    if (!illegalCharsRegex.test(trimmedName)) {
+    if (!illegalCharsRegex.test(category_name)) {
         return res.status(400).json({
             success: false,
-            message: "Category name must be a text string."
+            message: "Category name can't contain invalid characters."
         });
     }
 
     try {
-        const isUpdated = await categoryModel.updateCategory(categoryId, trimmedName, is_active);
+        const isUpdated = await categoryModel.updateCategory(categoryId, category_name, is_active);
 
         if (!isUpdated) {
             return res.status(404).json({
