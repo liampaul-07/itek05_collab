@@ -18,3 +18,4 @@ router.get('/:orderId/details/', orderDetailController.indexByOrderId);
 router.delete('/:orderId/details/:detailId', orderDetailController.destroy);
 
 module.exports = router;
+

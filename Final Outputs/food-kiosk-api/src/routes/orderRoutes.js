@@ -7,7 +7,6 @@ router.post('/', orderController.store)
 
 // GET
 router.get('/:orderId', orderController.show);
-
 router.get('/', orderController.index);
 
 // PUT /api/orders/status/:id

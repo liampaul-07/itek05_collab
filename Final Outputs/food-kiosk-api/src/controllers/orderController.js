@@ -1,32 +1,67 @@
 const { parse } = require('path');
 const orderModel = require('../models/orderModel');
+const customersModel = require('../models/customersModel');
+
+const illegalCharsRegex = /^[a-zA-Z\s-&!]+$/;
 
 const validateId = (id) => {
     const parsedId = parseInt(id);
     return !id || !Number.isInteger(parsedId) || parsedId <= 0 ? false : parsedId;
 };
 
-const store = async (req, res) => {
-    const { initCustomerId, initTicketName } = req.body;
-    const finalCustomerId = initCustomerId || null;
-    const finalTicketName = initTicketName || null;
-
-    if (finalCustomerId !== null && (isNaN(finalCustomerId) || parseInt(finalCustomerId) <= 0)){
-        return res.status(400).json({
-            success: false, 
-            message: "Invalid Customer ID."
-        });
+const sanitizeTicketName = (ticket_name) => {
+    if (ticket_name === null || typeof ticket_name === "undefined") {
+        return null;
     }
 
-    if (finalTicketName !== null && (typeof finalTicketName !== 'string' || finalTicketName.length > 50)) {
+    if (typeof ticket_name === "string" && ticket_name.trim() === "") {
+        return null;
+    }
+
+    return ticket_name;
+}
+
+const store = async (req, res) => {
+    const { customer_id: raw_customer_id = null, ticket_name } = req.body;
+    let customer_id = raw_customer_id;
+
+    if (typeof customer_id === 'string' && customer_id.trim() === '') {
+        customer_id = null;
+    }
+
+    if (customer_id !== null) {
+        const parsedId = parseInt(customer_id);
+
+        if (isNaN(parsedId) || !Number.isInteger(parsedId) || parsedId <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid Customer Id. If provided, it must be a positive integer."
+            });
+        }
+        customer_id = parsedId;
+    }
+
+    const finalTicketName = sanitizeTicketName(ticket_name);    
+    if (!illegalCharsRegex.test(finalTicketName)) {
         return res.status(400).json({
             success: false,
-            message: "Invalid ticket name length/type."
+            message: "ticket_name cannot include invalid characters."
         });
     }
 
     try {
-        const createResult = await orderModel.createOrder(finalCustomerId, finalTicketName);
+        if (customer_id !== null) {
+            const customerExists = await customersModel.getCustomersById(customer_id)
+
+            if (!customerExists || customerExists.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Customer doesn't exist. Please enter a valid existing customer_id."
+                });
+            }
+        }
+        
+        const createResult = await orderModel.createOrder(customer_id, finalTicketName);
 
         if (createResult && createResult.order_id) {
             res.status(201).json({
@@ -101,8 +136,7 @@ const show = async (req, res) => {
 
 const updateStatus = async (req, res) => {
     const order_id = validateId(req.params.orderId);
-    const { new_status } = req.body;
-    const statusToUpdate = new_status.toUpperCase();
+    const { status } = req.body;
     
     if (!order_id) {
         return res.status(400).json({
@@ -110,15 +144,25 @@ const updateStatus = async (req, res) => {
             message: "Invalid order ID format. Must be a positive integer."
         });
     } 
-    if (!new_status || typeof new_status !== 'string' || new_status.trim() === '') {
-        return res.status(400).json({
+
+    const orderExist = await orderModel.getOrderById(order_id);
+    if (!orderExist || orderExist.length === 0) {
+        res.status(400).json({
             success: false,
-            message: "Invalid or missing 'new_status' value."
-        });
+            message: "Order ID does not exist. Input a valid existing order_id."
+        })
     }
 
+    if (!status || typeof status !== 'string' || status.trim() === '') {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid or missing 'status' value."
+        });
+    }
+    const statusToUpdate = status.toUpperCase();
+
     const allowedStatuses = ['PENDING', 'PAID', 'CANCELLED', 'COMPLETED'];
-    if (!allowedStatuses.includes(new_status.toUpperCase())) {
+    if (!allowedStatuses.includes(status.toUpperCase())) {
         return res.status(400).json({
             success: false,
             message: `Invalid status value. Must be one of: ${allowedStatuses.join(', ')}.`

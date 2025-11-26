@@ -1,12 +1,13 @@
 //Imports the fooditem Model
 const foodModel = require('../models/foodModel');
+const categoryModel = require('../models/categoryModel');
 
 const validateId = (id) => {
     const parsedId = parseInt(id);
     return !id || !Number.isInteger(parsedId) || parsedId <= 0 ? false : parsedId;
 };
 
-const approvedNameRegex = /^[a-zA-Z0-9\s-&!]+$/;
+const approvedNameRegex = /^[a-zA-Z\s-&!]+$/;
 
 // POST/CREATE/STORE Controller
 const store = async (req, res) => {
@@ -18,19 +19,17 @@ const store = async (req, res) => {
         is_available
     } = req.body;
 
-    const trimmedName = name ? String(name).trim() : '';
-
-    if (trimmedName.length === 0) {
-        return res.status(400).json({ 
+    if (name === undefined || typeof name !== "string" || name.trim() === "") {
+        return res.status(400).json({
             success: false, 
-            message: "Name is required and cannot be empty." 
+            message: "Invalid name input. Name must be a valid string."
         });
     }
 
-    if (!approvedNameRegex.test(trimmedName)) { 
+    if (!approvedNameRegex.test(name)) { 
         return res.status(400).json({
             success: false,
-            message: "Food name contains disallowed characters. Only letters, numbers, spaces, hyphens (-), ampersands (&), and exclamation points (!) are permitted."
+            message: "Food name contains disallowed characters. Only letters, spaces, hyphens (-), ampersands (&), and exclamation points (!) are permitted."
         });
     }
 
@@ -40,6 +39,16 @@ const store = async (req, res) => {
             message: "Invalid category_id. Must be a positive integer."
         });
     } 
+
+    const categoryExist = await categoryModel.getCategoryById(category_id);
+
+    if (categoryExist === 0 || !categoryExist || categoryExist < 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Category_id does not exist."
+        });
+    }
+
     if (price === undefined || typeof price !== "number" || !isFinite(price) || price < 0) {
         return res.status(400).json({ 
             success: false, 
@@ -62,7 +71,7 @@ const store = async (req, res) => {
     }
 
     const itemData = {
-        name: trimmedName,
+        name: name,
         category_id,
         price,
         stock,
@@ -182,6 +191,15 @@ const indexByCategory = async (req, res) => {
     }
 
     try {
+        const categoryExist = await categoryModel.getCategoryById(category_id);
+
+        if (categoryExist === 0 || !categoryExist || categoryExist < 0) {
+            return res.status(400).json({
+            success: false,
+            message: "Category_id does not exist."
+              });
+    }
+
         const foodItems = await foodModel.getFoodByCategory(category_id);
 
         if (foodItems.length > 0) {
@@ -215,6 +233,15 @@ const update = async (req, res) => {
         });
     }
 
+    const foodExists = await foodModel.getFoodById(food_id)
+
+    if(!Array.isArray(foodExists) || foodExists.length === 0) {
+        return res.status(400).json({
+            success: false, 
+            message: 'Food ID not found.'
+        });
+    }
+
     const { 
         name,
         category_id,
@@ -237,30 +264,40 @@ const update = async (req, res) => {
         });
     }
 
-    if (category_id === undefined || typeof category_id !== "number" || category_id <= 0) {
+    if (category_id === undefined || typeof category_id !== "number" || category_id <= 0 || !category_id) {
         return res.status(400).json({
             success: false,
-            message: "Invalid category_id. Please input valid category_id."
+            message: "Invalid category_id. Category should be a positive integer."
         });
     } 
+
+    const categoryExist = await categoryModel.getCategoryById(category_id);
+
+    if (categoryExist === 0 || !categoryExist || categoryExist < 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Category_id does not exist."
+        });
+    }
+
     if (price === undefined || typeof price !== "number" || price < 0) {
         return res.status(400).json({ 
             success: false, 
-            message: "Invalid price number. Please input valid price number." 
+            message: "Invalid price number. Price should be a positive integer." 
         });
     }
 
     if (stock === undefined || typeof stock !== "number" || !Number.isInteger(stock) || stock < 0) {
         return res.status(400).json({ 
             success: false, 
-            message: "Invalid stock value. Please input valid stock number." 
+            message: "Invalid stock value. Stock should be a positive integer." 
         });        
     }
         
     if (is_available === undefined || typeof is_available !== "number" || !Number.isInteger(is_available) || (is_available !== 0 && is_available !== 1)) {
         return res.status(400).json({ 
             success: false, 
-            message: "Invalid is_available state. Please input valid is_available state." 
+            message: "Invalid is_available state. Input should be an integer (0 or 1)." 
         });   
     }
         
@@ -271,6 +308,8 @@ const update = async (req, res) => {
         stock, 
         is_available
     };
+
+    
 
     try {            
         //Call the Model function

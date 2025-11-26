@@ -47,11 +47,16 @@ const getCustomersById = async (id) => {
 // UPDATE Query
 const updateCustomer = async (customer_id, customer_name, contact, is_active) => {
     const sql = `UPDATE tbl_customers SET customer_name = ?, contact = ?, is_active = ? WHERE customer_id = ?`;
+
     const values = [customer_name, contact, is_active, customer_id];
 
+    const sqlCheck = "SELECT customer_name, contact, is_active FROM tbl_customers WHERE customer_id = ?"
+
     try {
-        const [result] = await db.query(sql, values);
-        return result;
+        await db.query(sql, values);
+
+        const [checkResult] = await db.query(sqlCheck, [customer_id]);
+        return checkResult;
     } catch (error) {
         console.error(`Error updating customer ${customer_id}:`, error);
         throw error;
@@ -73,8 +78,8 @@ const updateIsActive = async (customer_id, is_active) => {
 };
 
 // --- DELETE ---
-const deleteCustomer = async (customer_id) => {
-    const sql1 = `DELETE FROM tbl_order_details WHERE order_id IN (SELECT order_id FROM tbl_orders WHERE customer_id = ?)`;
+const destroyWithOrder = async (customer_id) => {
+    const sql1 = `DELETE FROM tbl_orderdetails WHERE order_id IN (SELECT order_id FROM tbl_orders WHERE customer_id = ?)`;
     const sql2 = 'DELETE FROM tbl_orders WHERE customer_id = ?';
     const sql3 = 'DELETE FROM tbl_customers WHERE customer_id = ?';
 
@@ -97,11 +102,23 @@ const deleteCustomer = async (customer_id) => {
     }
 };
 
+const destroy = async (customer_id) => {
+    const sql = 'DELETE FROM tbl_customer WHERE customer_id = ?';
+    try {
+        const [result] = await db.query(sql,[customer_id]);
+        return result; 
+    } catch (error) {
+        console.error(`Error deleting customer ${customer_id}:`, error);
+        throw error;
+    }
+}
+
 module.exports = {
     getCustomers,
     getCustomersById,
     createCustomer,
     updateCustomer,
     updateIsActive,
-    deleteCustomer,
+    destroyWithOrder,
+    destroy,
 };

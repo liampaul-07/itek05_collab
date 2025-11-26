@@ -1,9 +1,16 @@
-const customerModel = require('../models/customerModel');
+const customersModel = require('../models/customersModel');
+const orderModel = require('../models/orderModel');
+
+const illegalCharsRegex = /[^a-zA-Z\s.,'&-]/;
+
+const validateId = (id) => {
+    const parsedId = parseInt(id);
+    return !id || !Number.isInteger(parsedId) || parsedId <= 0 ? false : parsedId;
+};
 
 // --- CREATE (store): POST /api/customers ---
 const store = async (req, res) => {
-    const { customer_name, contact } = req.body; 
-    const illegalCharsRegex = /[^a-zA-Z0-9\s.,'&-]/;
+    const { customer_name, contact } = req.body;
 
     if (!customer_name || typeof customer_name !== 'string' || customer_name.trim().length === 0) {
         return res.status(400).json({
@@ -15,7 +22,7 @@ const store = async (req, res) => {
     if (illegalCharsRegex.test(customer_name.trim())) {
         return res.status(400).json({
             success: false,
-            message: "Customer name must be a text string."
+            message: "Customer name must be a valid text string."
         });
     }
     
@@ -35,7 +42,7 @@ const store = async (req, res) => {
     }
     
     try {
-        const newCustomer = await customerModel.createCustomer(customer_name, contact);
+        const newCustomer = await customersModel.createCustomer(customer_name, contact);
         
         if (newCustomer && newCustomer.customer_id > 0) {
             return res.status(201).json({
@@ -56,7 +63,7 @@ const store = async (req, res) => {
 // --- READ ALL (index): GET /api/customers ---
 const index = async (req, res) => {
     try {
-        const customers = await customerModel.getCustomers();
+        const customers = await customersModel.getCustomers();
         
         return res.status(200).json({
             success: true,
@@ -77,7 +84,7 @@ const show = async (req, res) => {
     const customer_id = req.params.customerId;
 
     try {
-        const customer = await customerModel.getCustomerById(customer_id);
+        const customer = await customersModel.getCustomersById(customer_id);
 
         if (!customer) {
             return res.status(404).json({
@@ -102,11 +109,27 @@ const show = async (req, res) => {
 
 // UPDATE Controllers
 const update = async (req, res) => {
-    const customer_id = req.params.customerId;
+    let customer_id = req.params.customerId;
     const { customer_name, contact, is_active } = req.body;
 
-    const illegalCharsRegex = /[^a-zA-Z0-9\s.,'&-]/;
+    if (!customer_id || isNaN(customer_id) || parseInt(customer_id) != customer_id ||  parseInt(customer_id) <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid customer ID. It must be a positive integer."
+        });
+    }
+
+    customer_id = parseInt(customer_id);
     
+    const customer = await customersModel.getCustomersById(customer_id);
+
+    if (!customer) {
+        return res.status(404).json({
+            success: false,
+            message: `Customer with ID ${customer_id} not found.`,
+        });
+    }
+
     if (!customer_name || typeof customer_name !== 'string' || customer_name.trim().length === 0) {
         return res.status(400).json({
             success: false,
@@ -127,6 +150,9 @@ const update = async (req, res) => {
             message: "Contact number is required and must be a non-empty string."
         });
     }
+
+
+
     const phoneRegex = /^09\d{9}$/;
 
     if (!phoneRegex.test(contact.trim())) {
@@ -144,7 +170,7 @@ const update = async (req, res) => {
     }
 
     try {
-        const result = await customerModel.updateCustomer(customer_id, customer_name, contact, is_active);
+        const result = await customersModel.updateCustomer(customer_id, customer_name, contact, is_active);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
@@ -179,7 +205,7 @@ const updateActive = async (req, res) => {
     }
 
     try {
-        const result = await customerModel.updateIsActive(customer_id, is_active);
+        const result = await customersModel.updateIsActive(customer_id, is_active);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
@@ -187,10 +213,7 @@ const updateActive = async (req, res) => {
                 message: `Customer with ID ${customer_id} not found.`,
             });
         }
-        return res.status(200).json({
-            success: true,
-            message: `Customer with ID ${customer_id} is_active state updated successfully.`
-        });
+        return res.status(204).end();
     } catch (error) {
         console.error(`Error in update controller for ID ${customer_id}:`, error);
         return res.status(500).json({
@@ -205,19 +228,22 @@ const destroy = async (req, res) => {
     const customer_id = req.params.customerId;
 
     try {
-        const result = await customerModel.deleteCustomer(customer_id);
+        const orderExist = await orderModel.getOrderByCustomer(customer_id);
 
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                success: false,
-                message: `Customer with ID ${customer_id} not found.`,
-            });
+        if (orderExist) {
+            const result = await customersModel.destroyWithOrder(customer_id);
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: `Customer with ID ${customer_id} not found.`,
+                });
+            }
+            
+            return res.status(204).end();
         }
-
-        return res.status(200).json({
-            success: true,
-            message: `Customer with ID ${customer_id} deleted successfully.`,
-        });
+        const result = await customersModel.destroy(customer_id);
+        return result;        
     } catch (error) {
         console.error(`Error in destroy controller for ID ${customer_id}:`, error);
         return res.status(500).json({

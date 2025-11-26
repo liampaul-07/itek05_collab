@@ -7,10 +7,8 @@ router.post('/', categoryController.store);
 
 // GET Requests
 router.get('/', categoryController.index);
-
-router.get('/:categoryId', categoryController.show);
-
 router.get('/active', categoryController.indexActive);
+router.get('/:categoryId', categoryController.show);
 
 // PUT REQUEST
 router.put('/:categoryId', categoryController.update);

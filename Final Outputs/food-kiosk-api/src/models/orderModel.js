@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { getCustomersById } = require('./customersModel');
 
 // CREATE Query
 const createOrder = async (customer_id, ticket_name) => {
@@ -21,7 +22,7 @@ const createOrder = async (customer_id, ticket_name) => {
 
 // GET Query
 const getOrder = async () => {
-    const sql = 'SELECT * FROM tbl_orders ORDER BY created_at DESC';
+    const sql = 'SELECT order_id, customer_id, ticket_name, status, total_amount FROM tbl_orders ORDER BY created_at DESC';
     
     try {
         const [rows] = await db.query(sql);
@@ -33,7 +34,7 @@ const getOrder = async () => {
 };
 
 const getOrderById = async (order_id) => {
-    const sql = 'SELECT * FROM tbl_orders WHERE order_id = ?';
+    const sql = 'SELECT customer_id, ticket_name, status, total_amount FROM tbl_orders WHERE order_id = ?';
 
     try {
         const [rows] = await db.query(sql, [order_id]);
@@ -43,6 +44,18 @@ const getOrderById = async (order_id) => {
         throw error;
     }
 };
+
+const getOrderByCustomer = async (customer_id) => {
+    const sql = 'SELECT * FROM tbl_orders WHERE customer_id = ?';
+
+    try {
+        const result = await db.query(sql, [customer_id]);
+        return result;
+    } catch (error) {
+        console.error(`Error fetching order by specific customer_id ${customer_id}`);
+        throw error;
+    }
+}
 
 // UPDATE Queries
 const updateStatus = async (order_id, new_status) => {
@@ -101,4 +114,5 @@ module.exports = {
     deleteOrder,
     updateStatus,
     updateTotalAmount,
+    getOrderByCustomer
 }

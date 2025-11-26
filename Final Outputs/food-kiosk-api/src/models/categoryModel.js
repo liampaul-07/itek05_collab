@@ -77,7 +77,7 @@ const deleteCategory = async (category_id) => {
     
     try {    
         const [result] = await db.query(sql, [category_id]);
-        return result.affectedRows > 0;
+        return result;
     } catch (error) {
         console.error(`Error deleting category ${category_id}:`, error);
         throw error;
