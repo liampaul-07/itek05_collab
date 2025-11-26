@@ -32,7 +32,7 @@ const store = async (req, res) => {
     if (customer_id !== null) {
         const parsedId = parseInt(customer_id);
 
-        if (isNaN(parseId) || !Number.isInteger(parsedId) || parsedId <= 0) {
+        if (isNaN(parsedId) || !Number.isInteger(parsedId) || parsedId <= 0) {
             return res.status(400).json({
                 success: false,
                 message: "Invalid Customer Id. If provided, it must be a positive integer."

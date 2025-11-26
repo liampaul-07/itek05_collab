@@ -1,4 +1,5 @@
 const categoryModel = require('../models/categoryModel');
+const foodModel = require('../models/foodModel');
 
 const validateId = (id) => {
     const parsedId = parseInt(id);
@@ -17,7 +18,8 @@ const store = async (req, res) => {
             message: "Invalid category_name input. Name must be a valid string."
         });
     }
-   
+    const trimmedName = category_name.trim();
+    
     if (is_active === undefined || typeof is_active !== "number" || (is_active !== 0 && is_active !== 1)) {
         return res.status(400).json({ 
             success: false, 
@@ -196,36 +198,84 @@ const destroy = async (req, res) => {
     if (!categoryId) {
         return res.status(400).json({
             success: false,
-            message: 'Invalid category ID format. Must be a positive integer.'
-        })
+            message: "Invalid category ID format. Must be a positive integer."
+        });
     }
 
     try {
-        const isDeleted = await categoryModel.deleteCategory(categoryId);
+        // STEP 1: Get food items under this category
+        const foodItems = await foodModel.getFoodByCategory(categoryId);
 
-        if (isDeleted) {
-            return res.status(204).end();
-        } else {
-            return res.status(404).json({
-                success: false,
-                message: `Category ID ${categoryId} not found.`
-            });
+        let categoryDeleteResult;
+
+        // STEP 2: Category has food items → delete them first
+        if (foodItems && foodItems.length > 0) {
+
+            const deleteFoodResult = await foodModel.deleteFoodByCategory(categoryId);
+
+            // (Optional) You can check if some items failed to delete
+            if (deleteFoodResult.affectedRows === 0) {
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to delete associated food items."
+                });
+            }
+
+            // Now delete the category
+            categoryDeleteResult = await categoryModel.deleteCategory(categoryId);
+
+            if (categoryDeleteResult.affectedRows > 0) {
+                return res.status(200).json({
+                    success: true,
+                    message: "Successfully deleted category and its associated food items."
+                });
+            }
+
+        } 
+        
+        // STEP 3: No food items → delete category directly
+        else {
+            categoryDeleteResult = await categoryModel.deleteCategory(categoryId);
+
+            if (categoryDeleteResult.affectedRows > 0) {
+                return res.status(204).end(); // No content, category deleted
+            }
         }
+
+        // STEP 4: Category not found
+        return res.status(404).json({
+            success: false,
+            message: `Category ID ${categoryId} not found or already deleted.`
+        });
+
     } catch (error) {
-        console.error(`Error in destroy controller for ID ${categoryId}:`, error);
-        if (error.code === 'ER_ROW_IS_REFERENCED' || error.errno === 1451) {
-            return res.status(409).json({ 
+        console.error(`Error deleting category ${categoryId}:`, error);
+
+        // Foreign key constraint (still referenced somewhere else)
+        if (error.errno === 1451 || error.code === "ER_ROW_IS_REFERENCED") {
+            return res.status(409).json({
                 success: false,
-                message: `Cannot delete Category ID ${categoryId}. It is currently referenced by existing food items.`,
+                message: `Cannot delete Category ID ${categoryId}. It is referenced by existing relationships.`,
                 error_code: 1451
             });
         }
+
         return res.status(500).json({
             success: false,
-            message: 'Internal Server Error while deleting category.'
+            message: "Internal Server Error while deleting category."
         });
     }
 };
+
+
+
+
+
+
+
+
+
+
 
 module.exports = {
     index,

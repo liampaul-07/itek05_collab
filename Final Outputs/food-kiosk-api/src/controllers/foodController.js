@@ -29,7 +29,7 @@ const store = async (req, res) => {
     if (!approvedNameRegex.test(name)) { 
         return res.status(400).json({
             success: false,
-            message: "Food name contains disallowed characters. Only letters, numbers, spaces, hyphens (-), ampersands (&), and exclamation points (!) are permitted."
+            message: "Food name contains disallowed characters. Only letters, spaces, hyphens (-), ampersands (&), and exclamation points (!) are permitted."
         });
     }
 
@@ -191,6 +191,15 @@ const indexByCategory = async (req, res) => {
     }
 
     try {
+        const categoryExist = await categoryModel.getCategoryById(category_id);
+
+        if (categoryExist === 0 || !categoryExist || categoryExist < 0) {
+            return res.status(400).json({
+            success: false,
+            message: "Category_id does not exist."
+              });
+    }
+
         const foodItems = await foodModel.getFoodByCategory(category_id);
 
         if (foodItems.length > 0) {
@@ -224,6 +233,15 @@ const update = async (req, res) => {
         });
     }
 
+    const foodExists = await foodModel.getFoodById(food_id)
+
+    if(!Array.isArray(foodExists) || foodExists.length === 0) {
+        return res.status(400).json({
+            success: false, 
+            message: 'Food ID not found.'
+        });
+    }
+
     const { 
         name,
         category_id,
@@ -231,8 +249,6 @@ const update = async (req, res) => {
         stock, 
         is_available
     } = req.body;
-
-
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
         return res.status(400).json({
@@ -247,7 +263,6 @@ const update = async (req, res) => {
             message: "Food name must be a text string."
         });
     }
-
 
     if (category_id === undefined || typeof category_id !== "number" || category_id <= 0 || !category_id) {
         return res.status(400).json({
@@ -293,6 +308,8 @@ const update = async (req, res) => {
         stock, 
         is_available
     };
+
+    
 
     try {            
         //Call the Model function

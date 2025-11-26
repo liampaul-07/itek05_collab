@@ -152,13 +152,60 @@ const adjustStock = async (food_id, quantityChange) => {
 };
 
 // DELETE Query
-const deleteFood = async (food_id) => {
-    const sql = 'DELETE FROM tbl_fooditems WHERE food_id = ?';
+const destroy = async (req, res) => {
+    const categoryId = validateId(req.params.categoryId);
+
+    if (!categoryId) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid category ID format. Must be a positive integer.'
+        });
+    }
+
+    try {
+        const result = await categoryModel.deleteCategory(categoryId);
+
+        // Expecting result to be the DB result object with affectedRows
+        if (result && result.affectedRows > 0) {
+            return res.status(200).json({
+                success: true,
+                message: `Category ID ${categoryId} deleted successfully.`
+            });
+        }
+
+        // Nothing deleted: category not found
+        return res.status(404).json({
+            success: false,
+            message: `Category ID ${categoryId} not found or already deleted.`
+        });
+
+    } catch (error) {
+        console.error(`Error deleting category ${categoryId}:`, error);
+
+        // Foreign key constraint (cannot delete because child rows exist)
+        if (error.code === 'ER_ROW_IS_REFERENCED' || error.errno === 1451) {
+            return res.status(409).json({
+                success: false,
+                message: `Cannot delete Category ID ${categoryId}: it is referenced by other records.`,
+                error_code: 1451
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: 'Internal Server Error while deleting category.'
+        });
+    }
+};
+
+
+const deleteFoodByCategory = async (category_id) => {
+    const sql = 'DELETE FROM tbl_fooditems WHERE category_id = ?';
 
     try {
         //Returns true if there are affected rows.
-        const [deleteStatus] = await db.query(sql, [food_id]);
-        return deleteStatus.affectedRows > 0;
+        const [deleteStatus] = await db.query(sql, [category_id]);
+        return deleteStatus;
 
     } catch (error) {
         console.error("Error deleting food item:", error);
@@ -177,6 +224,7 @@ module.exports = {
     updateAvailability,
     getFoodAvailability,
     adjustStock,
-    deleteFood,
+    destroy,
+    deleteFoodByCategory,
 };
 

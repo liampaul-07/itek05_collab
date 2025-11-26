@@ -3,6 +3,11 @@ const orderModel = require('../models/orderModel');
 
 const illegalCharsRegex = /[^a-zA-Z\s.,'&-]/;
 
+const validateId = (id) => {
+    const parsedId = parseInt(id);
+    return !id || !Number.isInteger(parsedId) || parsedId <= 0 ? false : parsedId;
+};
+
 // --- CREATE (store): POST /api/customers ---
 const store = async (req, res) => {
     const { customer_name, contact } = req.body;
@@ -104,9 +109,27 @@ const show = async (req, res) => {
 
 // UPDATE Controllers
 const update = async (req, res) => {
-    const customer_id = req.params.customerId;
+    let customer_id = req.params.customerId;
     const { customer_name, contact, is_active } = req.body;
+
+    if (!customer_id || isNaN(customer_id) || parseInt(customer_id) != customer_id ||  parseInt(customer_id) <= 0) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid customer ID. It must be a positive integer."
+        });
+    }
+
+    customer_id = parseInt(customer_id);
     
+    const customer = await customersModel.getCustomersById(customer_id);
+
+    if (!customer) {
+        return res.status(404).json({
+            success: false,
+            message: `Customer with ID ${customer_id} not found.`,
+        });
+    }
+
     if (!customer_name || typeof customer_name !== 'string' || customer_name.trim().length === 0) {
         return res.status(400).json({
             success: false,
@@ -127,6 +150,9 @@ const update = async (req, res) => {
             message: "Contact number is required and must be a non-empty string."
         });
     }
+
+
+
     const phoneRegex = /^09\d{9}$/;
 
     if (!phoneRegex.test(contact.trim())) {
