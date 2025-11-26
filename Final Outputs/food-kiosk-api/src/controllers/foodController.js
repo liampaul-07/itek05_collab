@@ -131,13 +131,12 @@ const show = async (req, res) => {
                 success: true,
                 data: foodItems
             });
-        } 
-        
-        return res.status(404).json({
+        } else {
+            return res.status(404).json({
                 success: false,
                 message: `Food item ID ${food_id} not found.`
             });
-            
+        }
     } catch (error) {
         console.error("Error in show controller:", error);
         return res.status(500).json({
